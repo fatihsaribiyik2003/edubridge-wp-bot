@@ -73,6 +73,9 @@ class Bot {
     async handleMessage(msg) {
         if (!msg.body) return;
 
+        // Ignore group messages (Privacy & Spam prevention)
+        if (msg.from.endsWith('@g.us')) return;
+
         // Command parsing
         const args = msg.body.split(' ');
         const commandName = args[0].toLowerCase();
