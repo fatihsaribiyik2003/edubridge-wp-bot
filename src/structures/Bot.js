@@ -22,6 +22,7 @@ class Bot {
     initialize() {
         this.loadCommands();
         this.registerEvents();
+        this.setupGracefulShutdown();
         this.client.initialize();
     }
 
@@ -102,6 +103,22 @@ class Bot {
                 }
             }
         }
+    }
+
+    setupGracefulShutdown() {
+        process.on('SIGINT', async () => {
+            console.log('⚠️ Kapatılıyor... (SIGINT)');
+            await this.client.destroy();
+            console.log('✅ Bot ve tarayıcı kapatıldı.');
+            process.exit(0);
+        });
+
+        process.on('SIGTERM', async () => {
+            console.log('⚠️ Kapatılıyor... (SIGTERM)');
+            await this.client.destroy();
+            console.log('✅ Bot ve tarayıcı kapatıldı.');
+            process.exit(0);
+        });
     }
 }
 
