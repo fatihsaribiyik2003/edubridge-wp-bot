@@ -9,16 +9,18 @@ class Bot {
             authStrategy: new LocalAuth(),
             puppeteer: {
                 headless: true,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process', // Important for VPS/Docker environments
-                    '--disable-gpu'
-                ],
+                args: process.platform === 'win32' ?
+                    ['--no-sandbox', '--disable-setuid-sandbox'] : // Windows: Minimal args
+                    [ // Linux/VPS: Robust args
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-accelerated-2d-canvas',
+                        '--no-first-run',
+                        '--no-zygote',
+                        '--single-process',
+                        '--disable-gpu'
+                    ],
                 executablePath: process.platform === 'darwin' ? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' : undefined
             },
         });
