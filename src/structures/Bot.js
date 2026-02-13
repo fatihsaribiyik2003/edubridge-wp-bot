@@ -2,7 +2,6 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const fs = require('fs');
 const path = require('path');
 const qrcode = require('qrcode-terminal');
-const AnnouncementManager = require('../managers/AnnouncementManager');
 
 class Bot {
     constructor() {
@@ -16,7 +15,6 @@ class Bot {
         });
 
         this.commands = new Map();
-        this.announcementManager = new AnnouncementManager(this.client);
         this.client.handoffStates = new Map();
     }
 
@@ -31,8 +29,12 @@ class Bot {
 
         for (const file of commandFiles) {
             const command = require(`../commands/${file}`);
-            if (command.name) {
-                this.commands.set(command.name, command);
+
+            // Support both standard exports and class instances
+            const cmdName = command.name || command.command;
+
+            if (cmdName) {
+                this.commands.set(cmdName, command);
             }
             if (command.aliases) {
                 command.aliases.forEach(alias => this.commands.set(alias, command));
@@ -49,7 +51,14 @@ class Bot {
 
         this.client.on('ready', () => {
             console.log('Bot kullanıma hazır!');
-            this.announcementManager.load();
+
+            // Initialize commands that have an init method (like Duyuru)
+            this.commands.forEach(command => {
+                if (typeof command.init === 'function') {
+                    command.init(this.client);
+                }
+            });
+
             this.client.sendMessage('905387994516@c.us', 'Bot çalıştı 🚀', { sendSeen: false });
         });
 
@@ -62,27 +71,29 @@ class Bot {
     async handleMessage(msg) {
         if (!msg.body) return;
 
-        // Command parsing (very basic for now, can be improved)
+        // Command parsing
         const args = msg.body.split(' ');
         const commandName = args[0].toLowerCase();
 
         if (this.commands.has(commandName)) {
             try {
                 const command = this.commands.get(commandName);
-                await command.execute(msg, this.client, this.announcementManager);
+                await command.execute(msg, this.client);
             } catch (error) {
                 console.error(`Komut hatası (${commandName}):`, error);
                 msg.reply('❌ Bir hata oluştu.');
             }
         }
-
-        // Handle commands that start with text but have arguments (like !gemini, !ai)
-        // This part needs to be more flexible. For now, let's iterate to check "startsWith" commands if exact match fails
         else {
             for (const [name, command] of this.commands.entries()) {
-                if (command.isPrefix && msg.body.toLowerCase().startsWith(name)) {
+                // Check for isPrefix or simple startsWith logic if command object allows it
+                // Re-aligned with previous logic:
+                if ((command.isPrefix || command.command) && msg.body.toLowerCase().startsWith(name)) {
+                    // Check exact match first
+                    if (this.commands.has(commandName) && this.commands.get(commandName) === command) continue;
+
                     try {
-                        await command.execute(msg, this.client, this.announcementManager);
+                        await command.execute(msg, this.client);
                         return; // Execute only one
                     } catch (error) {
                         console.error(`Komut hatası (${name}):`, error);
