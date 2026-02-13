@@ -62,15 +62,6 @@ module.exports = {
             else if (cmd.name === '!duyuru') {
                 helpMessage += `🔹 *!duyuru* - ${cmd.description || 'Duyuru sistemi.'}\n`;
             }
-            else if (cmd.command === '!butik') {
-                helpMessage += `🔹 *!butik* - Butik ürünlerini sorgular.\n`;
-            }
-            else if (cmd.command === '!rodos') {
-                helpMessage += `🔹 *!rodos* - Rodos veritabanında arama yapar.\n`;
-            }
-            else if (cmd.command === '!sados') {
-                helpMessage += `🔹 *!sados* - Sados sistemini sorgular.\n`;
-            }
             else {
                 // Fallback
                 if (cmd.name && !['!merhaba', '!asistan', '!gemini', '!duyuru'].includes(cmd.name)) {
