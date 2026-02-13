@@ -16,6 +16,7 @@ class Bot {
 
         this.commands = new Map();
         this.client.handoffStates = new Map();
+        this.client.commands = this.commands; // Expose commands to client
     }
 
     initialize() {
