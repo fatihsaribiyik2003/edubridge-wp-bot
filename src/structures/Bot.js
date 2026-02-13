@@ -17,6 +17,7 @@ class Bot {
 
         this.commands = new Map();
         this.announcementManager = new AnnouncementManager(this.client);
+        this.client.handoffStates = new Map();
     }
 
     initialize() {
