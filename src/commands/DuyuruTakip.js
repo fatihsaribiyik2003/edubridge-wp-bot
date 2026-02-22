@@ -65,7 +65,13 @@ class DuyuruTakip {
                 }
                 await client.sendMessage(NOTIFY_NUMBER, errMsg);
             } else {
-                console.log('ℹ️ Yeni ilan yok. Son kontrol:', lastCheckTime.toLocaleString('tr-TR'));
+                // Yeni ilan yok — yine de bildirim gönder
+                let noNewsMsg = '✅ *Duyurular kontrol edildi, yeni ilan yok.*\n\n';
+                for (const uni of announcementService.universities) {
+                    noNewsMsg += `🔗 ${uni.url}\n`;
+                }
+                await client.sendMessage(NOTIFY_NUMBER, noNewsMsg.trim());
+                console.log('ℹ️ Yeni ilan yok, bildirim gönderildi. Son kontrol:', lastCheckTime.toLocaleString('tr-TR'));
             }
 
             return results;
