@@ -2,8 +2,14 @@ const fetch = require('node-fetch');
 const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 const DATA_FILE = path.join(__dirname, '../../seen_announcements.json');
+
+// Bazı üniversite siteleri geçersiz SSL sertifikası kullanabildiği için doğrulama hatasını yok sayalım:
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false
+});
 
 class AnnouncementService {
     constructor() {
@@ -12,14 +18,43 @@ class AnnouncementService {
                 name: 'SUBÜ (Sakarya Uygulamalı Bilimler Üniversitesi)',
                 shortName: 'SUBÜ',
                 url: 'https://ilan.subu.edu.tr/',
-                sections: [
-                    'Sonuçlar',
-                    'Öğretim Üyesi İlanları',
-                    'Öğretim Elemanı İlanları',
-                    'İdari Personel İlanları',
-                    'Görevde Yükselme ve Ünvan Değişikliği Sınavı',
-                    'Duyurular'
-                ]
+                sections: ['Sonuçlar', 'Öğretim Üyesi İlanları', 'Öğretim Elemanı İlanları', 'İdari Personel İlanları', 'Görevde Yükselme ve Ünvan Değişikliği Sınavı', 'Duyurular']
+            },
+            {
+                name: 'İstanbul Teknik Üniversitesi',
+                shortName: 'İTÜ',
+                url: 'https://www.itu.edu.tr/duyurular',
+                sections: ['Akademik Personel', 'Genel Duyurular']
+            },
+            {
+                name: 'Kocaeli Üniversitesi',
+                shortName: 'Kocaeli Üni',
+                url: 'https://www.kocaeli.edu.tr/duyuru-ve-etkinlikler',
+                sections: ['Öğretim Elemanı Alımı', 'Öğretim Üyesi', 'Genel']
+            },
+            {
+                name: 'Ege Üniversitesi (İzmir)',
+                shortName: 'Ege Üni',
+                url: 'https://ege.edu.tr/tr-0/duyurular.html',
+                sections: ['Akademik Personel']
+            },
+            {
+                name: 'Düzce Üniversitesi',
+                shortName: 'Düzce Üni',
+                url: 'https://personel.duzce.edu.tr/Duyurular',
+                sections: ['Akademik Personel Alımı', 'Genel']
+            },
+            {
+                name: 'Bursa Uludağ Üniversitesi',
+                shortName: 'Bursa Üni',
+                url: 'https://uludag.edu.tr/',
+                sections: ['Öğretim Üyesi', 'Öğretim Görevlisi']
+            },
+            {
+                name: 'Çukurova Üniversitesi',
+                shortName: 'Çukurova Üni',
+                url: 'https://cu.edu.tr/',
+                sections: ['Akademik Personel', 'Araştırma Görevlisi']
             }
         ];
         this.seenAnnouncements = this.loadSeen();
@@ -46,8 +81,9 @@ class AnnouncementService {
 
     async fetchPage(url) {
         const response = await fetch(url, {
+            agent: httpsAgent,
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml',
                 'Accept-Language': 'tr-TR,tr;q=0.9'
             },
@@ -65,103 +101,90 @@ class AnnouncementService {
         const $ = cheerio.load(html);
         const announcements = [];
 
-        // SUBU page uses h2 headers for sections followed by links
-        // Each section has a view-content div with links
         $('h2').each((_, headerEl) => {
             const sectionTitle = $(headerEl).text().trim();
-
-            // Skip irrelevant headers
-            const relevantSections = [
-                'Sonuçlar',
-                'Öğretim Üyesi İlanları',
-                'Öğretim Elemanı İlanları',
-                'İdari Personel İlanları',
-                'Görevde Yükselme ve Ünvan Değişikliği Sınavı',
-                'Duyurular'
-            ];
+            const relevantSections = ['Sonuçlar', 'Öğretim Üyesi İlanları', 'Öğretim Elemanı İlanları', 'İdari Personel İlanları', 'Görevde Yükselme ve Ünvan Değişikliği Sınavı', 'Duyurular'];
 
             if (!relevantSections.some(s => sectionTitle.includes(s))) return;
 
-            // Get the container after the h2 (Drupal views typically use .view-content)
-            const container = $(headerEl).closest('.block, .region, section, .panel-pane')
-                .find('.view-content, .item-list');
+            let container = $(headerEl).closest('.block, .region, section, .panel-pane').find('.view-content, .item-list');
+            let links = container.length ? container.find('a') : $(headerEl).parent().find('a').filter((_, el) => $(el).attr('href') && $(el).attr('href').includes('/tr/node/'));
 
-            // Also try siblings
-            let links;
-            if (container.length) {
-                links = container.find('a');
-            } else {
-                // Fallback: get the next sibling elements until next h2
-                const parent = $(headerEl).parent();
-                links = parent.find('a').filter((_, el) => {
-                    const href = $(el).attr('href');
-                    return href && href.includes('/tr/node/');
-                });
-            }
-
-            // If still no luck, search in the same parent block
             if (!links || links.length === 0) {
                 const block = $(headerEl).closest('.block');
                 if (block.length) {
-                    links = block.find('a').filter((_, el) => {
-                        const href = $(el).attr('href');
-                        return href && (href.includes('/tr/node/') || href.includes('/tr/'));
-                    });
+                    links = block.find('a').filter((_, el) => $(el).attr('href') && ($(el).attr('href').includes('/tr/node/') || $(el).attr('href').includes('/tr/')));
                 }
             }
 
             if (links && links.length) {
                 links.each((_, linkEl) => {
-                    const title = $(linkEl).text().trim();
+                    const title = $(linkEl).text().trim().replace(/\s+/g, ' ');
                     let href = $(linkEl).attr('href');
 
-                    // Skip "Hepsi" links and empty titles
-                    if (!title || title === 'Hepsi' || !href) return;
-                    // Skip non-content links
-                    if (href === '/' || href === '#' || href === 'https://ilan.subu.edu.tr/') return;
+                    if (!title || title === 'Hepsi' || !href || href === '/' || href === '#' || href === 'https://ilan.subu.edu.tr/') return;
+                    if (href.startsWith('/')) href = 'https://ilan.subu.edu.tr' + href;
 
-                    // Make absolute URL
-                    if (href.startsWith('/')) {
-                        href = 'https://ilan.subu.edu.tr' + href;
-                    }
-
-                    // Avoid duplicates within same parse
                     if (!announcements.some(a => a.url === href)) {
-                        announcements.push({
-                            section: sectionTitle,
-                            title: title,
-                            url: href
-                        });
+                        announcements.push({ section: sectionTitle, title: title, url: href });
                     }
                 });
             }
         });
 
-        // Fallback: if h2-based parsing found nothing, try link-based approach
         if (announcements.length === 0) {
-            $('a').each((_, el) => {
-                const href = $(el).attr('href');
-                const title = $(el).text().trim();
+            return this.parseGeneric(html, { url: 'https://ilan.subu.edu.tr/' });
+        }
 
-                if (href && href.includes('/tr/node/') && title && title.length > 10) {
-                    const fullUrl = href.startsWith('/') ? 'https://ilan.subu.edu.tr' + href : href;
-                    if (!announcements.some(a => a.url === fullUrl)) {
+        return announcements;
+    }
+
+    parseGeneric(html, uni) {
+        const $ = cheerio.load(html);
+        const announcements = [];
+        let baseUrl = new URL(uni.url).origin;
+
+        $('a').each((_, el) => {
+            const text = $(el).text().trim().toLowerCase();
+            let href = $(el).attr('href');
+
+            if (!href || href === '#' || href === '/' || href.startsWith('javascript:')) return;
+
+            const keywords = ['öğretim', 'akademik', 'ilan', 'araştırma', 'doçent', 'profesör', 'görevli', 'personel alım', 'öğretim elemanı', 'sınav', 'başvuru', 'sonuç', 'personel', 'duyuru'];
+            const excludeWords = ['yönetmelik', 'yönerge', 'mevzuat', 'rehber', 'form', 'dilekçe', 'iletişim', 'telefon', 'adres', 'ebys', 'e-posta', 'harita', 'kurumsal', 'misyon', 'vizyon', 'tarihçe'];
+
+            if (keywords.some(k => text.includes(k)) && !excludeWords.some(k => text.includes(k)) && text.length > 5 && text.length < 250) {
+                let fullUrl = href;
+                if (href.startsWith('/')) {
+                    fullUrl = baseUrl + href;
+                } else if (!href.startsWith('http')) {
+                    try { fullUrl = new URL(href, uni.url).href; } catch (e) { fullUrl = uni.url.endsWith('/') ? uni.url + href : uni.url + '/' + href; }
+                }
+
+                if (!announcements.some(a => a.url === fullUrl)) {
+                    const title = $(el).text().trim().replace(/\s+/g, ' ');
+                    // Sadece gerçekten başlık gibi duran, yeterince uzun metinleri alalım (çok kısa butonları filtrelemek için)
+                    if (title.length > 8) {
                         announcements.push({
-                            section: 'Genel',
+                            section: 'Akademik/Personel İlanları',
                             title: title,
                             url: fullUrl
                         });
                     }
                 }
-            });
-        }
+            }
+        });
 
         return announcements;
     }
 
     async checkUniversity(uni) {
         const html = await this.fetchPage(uni.url);
-        return this.parseSUBU(html);
+        if (uni.shortName === 'SUBÜ') {
+            return this.parseSUBU(html);
+        } else {
+            return this.parseGeneric(html, uni);
+        }
     }
 
     async getNewAnnouncements(uni) {
@@ -175,7 +198,6 @@ class AnnouncementService {
         const seenUrls = new Set(this.seenAnnouncements[key]);
         const newOnes = allAnnouncements.filter(a => !seenUrls.has(a.url));
 
-        // Mark all current announcements as seen
         const allUrls = allAnnouncements.map(a => a.url);
         this.seenAnnouncements[key] = allUrls;
         this.saveSeen();
@@ -218,7 +240,6 @@ class AnnouncementService {
 
             message += `🏫 *${result.university.shortName}*\n`;
 
-            // Group by section
             const bySection = {};
             for (const ann of result.announcements) {
                 if (!bySection[ann.section]) bySection[ann.section] = [];
@@ -237,7 +258,6 @@ class AnnouncementService {
         return message.trim();
     }
 
-    // İlk çalıştırmada mevcut tüm ilanları "görülmüş" olarak kaydet
     async initializeSeen() {
         let initialized = false;
         for (const uni of this.universities) {

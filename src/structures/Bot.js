@@ -38,21 +38,29 @@ class Bot {
     }
 
     loadCommands() {
-        const commandFiles = fs.readdirSync(path.join(__dirname, '../commands')).filter(file => file.endsWith('.js'));
+        const commandsPath = path.join(__dirname, '../commands');
 
-        for (const file of commandFiles) {
-            const command = require(`../commands/${file}`);
+        const readCommands = (dir) => {
+            const files = fs.readdirSync(dir);
+            for (const file of files) {
+                const fullPath = path.join(dir, file);
+                if (fs.statSync(fullPath).isDirectory()) {
+                    readCommands(fullPath);
+                } else if (fullPath.endsWith('.js')) {
+                    const command = require(fullPath);
+                    const cmdName = command.name || command.command;
 
-            // Support both standard exports and class instances
-            const cmdName = command.name || command.command;
-
-            if (cmdName) {
-                this.commands.set(cmdName, command);
+                    if (cmdName) {
+                        this.commands.set(cmdName, command);
+                    }
+                    if (command.aliases) {
+                        command.aliases.forEach(alias => this.commands.set(alias, command));
+                    }
+                }
             }
-            if (command.aliases) {
-                command.aliases.forEach(alias => this.commands.set(alias, command));
-            }
-        }
+        };
+
+        readCommands(commandsPath);
         console.log(`${this.commands.size} komut yüklendi.`);
     }
 
