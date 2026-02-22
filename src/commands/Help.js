@@ -62,6 +62,13 @@ module.exports = {
             else if (cmd.name === '!duyuru') {
                 helpMessage += `🔹 *!duyuru* - ${cmd.description || 'Duyuru sistemi.'}\n`;
             }
+            else if (cmd.command === '!takip') {
+                helpMessage += `🔹 *!takip başlat* - Günlük ilan takibini başlatır.\n`;
+                helpMessage += `🔹 *!takip durdur* - Takibi durdurur.\n`;
+                helpMessage += `🔹 *!takip kontrol* - Anlık ilan kontrolü yapar.\n`;
+                helpMessage += `🔹 *!takip durum* - Takip durumunu gösterir.\n`;
+                helpMessage += `🔹 *!takip liste* - Takip edilen üniversiteleri listeler.\n`;
+            }
             else {
                 // Fallback
                 if (cmd.name && !['!merhaba', '!asistan', '!gemini', '!duyuru'].includes(cmd.name)) {
