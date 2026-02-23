@@ -18,43 +18,43 @@ class AnnouncementService {
                 name: 'SUBÜ (Sakarya Uygulamalı Bilimler Üniversitesi)',
                 shortName: 'SUBÜ',
                 url: 'https://ilan.subu.edu.tr/',
-                sections: ['Sonuçlar', 'Öğretim Üyesi İlanları', 'Öğretim Elemanı İlanları', 'İdari Personel İlanları', 'Görevde Yükselme ve Ünvan Değişikliği Sınavı', 'Duyurular']
+                sections: ['Sonuçlar', 'Öğretim Üyesi', 'İdari Personel']
             },
             {
                 name: 'İstanbul Teknik Üniversitesi',
                 shortName: 'İTÜ',
-                url: 'https://www.itu.edu.tr/duyurular',
-                sections: ['Akademik Personel', 'Genel Duyurular']
-            },
-            {
-                name: 'Kocaeli Üniversitesi',
-                shortName: 'Kocaeli Üni',
-                url: 'https://www.kocaeli.edu.tr/duyuru-ve-etkinlikler',
-                sections: ['Öğretim Elemanı Alımı', 'Öğretim Üyesi', 'Genel']
+                url: 'https://pdb.itu.edu.tr/',
+                sections: ['Personel Daire Başkanlığı']
             },
             {
                 name: 'Ege Üniversitesi (İzmir)',
                 shortName: 'Ege Üni',
-                url: 'https://ege.edu.tr/tr-0/duyurular.html',
-                sections: ['Akademik Personel']
+                url: 'https://personeldb.ege.edu.tr/tr-1616/duyurular.html',
+                sections: ['Akademik Kadro', 'Atama']
             },
             {
                 name: 'Düzce Üniversitesi',
                 shortName: 'Düzce Üni',
                 url: 'https://personel.duzce.edu.tr/Duyurular',
-                sections: ['Akademik Personel Alımı', 'Genel']
+                sections: ['Personel İlanları']
             },
             {
                 name: 'Bursa Uludağ Üniversitesi',
                 shortName: 'Bursa Üni',
-                url: 'https://uludag.edu.tr/',
-                sections: ['Öğretim Üyesi', 'Öğretim Görevlisi']
+                url: 'https://uludag.edu.tr/personel',
+                sections: ['Sözleşmeli', 'Akademik İlan']
             },
             {
                 name: 'Çukurova Üniversitesi',
                 shortName: 'Çukurova Üni',
-                url: 'https://cu.edu.tr/',
-                sections: ['Akademik Personel', 'Araştırma Görevlisi']
+                url: 'https://personel.cu.edu.tr/',
+                sections: ['İlanlar']
+            },
+            {
+                name: 'SBB Kamu İlanları (Kariyer Kapısı)',
+                shortName: 'SBB (Kamu)',
+                url: 'https://kamuilan.sbb.gov.tr/',
+                sections: ['SSB', 'Memur', 'Sözleşmeli', 'Akademik']
             }
         ];
         this.seenAnnouncements = this.loadSeen();
@@ -145,15 +145,19 @@ class AnnouncementService {
         let baseUrl = new URL(uni.url).origin;
 
         $('a').each((_, el) => {
-            const text = $(el).text().trim().toLowerCase();
+            const text = $(el).text().trim().replace(/\s+/g, ' ');
+            const lowerText = text.toLowerCase();
             let href = $(el).attr('href');
 
             if (!href || href === '#' || href === '/' || href.startsWith('javascript:')) return;
 
-            const keywords = ['öğretim', 'akademik', 'ilan', 'araştırma', 'doçent', 'profesör', 'görevli', 'personel alım', 'öğretim elemanı', 'sınav', 'başvuru', 'sonuç', 'personel', 'duyuru'];
-            const excludeWords = ['yönetmelik', 'yönerge', 'mevzuat', 'rehber', 'form', 'dilekçe', 'iletişim', 'telefon', 'adres', 'ebys', 'e-posta', 'harita', 'kurumsal', 'misyon', 'vizyon', 'tarihçe'];
+            // Sadece personel alımı ve akademik kadro ilanları ile ilgili kesin kelimeler
+            const keywords = ['öğretim elemanı', 'öğretim üyesi', 'akademik', 'personel', 'sözleşmeli', 'araştırma görevlisi', 'doçent', 'profesör', 'öğretim görevlisi', 'kadro ilanı', 'ilanı', 'ilanları', 'alım', 'atama', 'sonuç', 'yerleştirme', 'sürekli işçi'];
 
-            if (keywords.some(k => text.includes(k)) && !excludeWords.some(k => text.includes(k)) && text.length > 5 && text.length < 250) {
+            // Kesinlikle dahil edilmemesi gereken, kurum hakkındaki sistem sayfaları
+            const excludeWords = ['yönetmelik', 'yönerge', 'mevzuat', 'rehber', 'form', 'dilekçe', 'iletişim', 'telefon', 'adres', 'ebys', 'e-posta', 'harita', 'kurumsal', 'misyon', 'vizyon', 'tarihçe', 'öğrenci', 'yemek', 'burs', 'sempozyum', 'tören', 'kongre', 'konferans', 'şenlik', 'festival', 'spor', 'mezuniyet', 'ders', 'sınav takvimi', 'akademik takvim', 'yatay geçiş', 'yüksek lisans', 'doktora', 'uzaktan eğitim', 'anasayfa', 'ana sayfa', 'hakkımızda', 'personel listesi', 'devamını oku', 'tüm duyurular', 'organizasyon', 'faaliyet raporu', 'hizmet', 'iş akış', 'şeması', 'teşkilat', 'kalite', 'politikaları', 'başkanı'];
+
+            if (keywords.some(k => lowerText.includes(k)) && !excludeWords.some(k => lowerText.includes(k))) {
                 let fullUrl = href;
                 if (href.startsWith('/')) {
                     fullUrl = baseUrl + href;
@@ -162,15 +166,11 @@ class AnnouncementService {
                 }
 
                 if (!announcements.some(a => a.url === fullUrl)) {
-                    const title = $(el).text().trim().replace(/\s+/g, ' ');
-                    // Sadece gerçekten başlık gibi duran, yeterince uzun metinleri alalım (çok kısa butonları filtrelemek için)
-                    if (title.length > 8) {
-                        announcements.push({
-                            section: 'Akademik/Personel İlanları',
-                            title: title,
-                            url: fullUrl
-                        });
-                    }
+                    announcements.push({
+                        section: 'Personel İlanları / Duyurular',
+                        title: text,
+                        url: fullUrl
+                    });
                 }
             }
         });
@@ -182,9 +182,62 @@ class AnnouncementService {
         const html = await this.fetchPage(uni.url);
         if (uni.shortName === 'SUBÜ') {
             return this.parseSUBU(html);
+        } else if (uni.shortName === 'SBB (Kamu)') {
+            return await this.parseSBB(uni);
         } else {
             return this.parseGeneric(html, uni);
         }
+    }
+
+    async parseSBB(uni) {
+        // SBB için kendi içindeki tüm ilan detay sayfalarını tek tek gezip Bilgisayar Mühendisi arayacağız.
+        const html = await this.fetchPage(uni.url);
+        const $ = cheerio.load(html);
+        const announcements = [];
+        const sbbLinks = [];
+
+        $('a').each((_, el) => {
+            const href = $(el).attr('href');
+            let text = $(el).text().trim().replace(/\\s+/g, ' ');
+
+            if (href && href.includes('ilanDetay.aspx')) {
+                let fullUrl = href.startsWith('http') ? href : 'https://kamuilan.sbb.gov.tr/' + href;
+                if (!sbbLinks.some(l => l.url === fullUrl)) {
+                    sbbLinks.push({ title: text, url: fullUrl });
+                }
+            }
+        });
+
+        // Tüm SBB linklerine tek tek girip metni kontrol edelim:
+        for (const link of sbbLinks) {
+            // Check if we already saw this SBB link
+            if (this.seenAnnouncements.some(seen => seen.url === link.url)) {
+                continue; // Zaten görülmüş ilansa içine girmeyelim boşuna (performans)
+            }
+
+            try {
+                const detailHtml = await this.fetchPage(link.url);
+                const detail$ = cheerio.load(detailHtml);
+                const bodyText = detail$('body').text().toLowerCase();
+
+                // Kariyer Kapısı alternatifinde "Bilgisayar Mühendisi" arama filtresi:
+                if (bodyText.includes('bilgisayar mühendis') || bodyText.includes('bilişim personel')) {
+                    announcements.push({
+                        section: '💻 Bilgisayar Mühendisi / Bilişim Personeli İlanı',
+                        title: link.title,
+                        url: link.url
+                    });
+                } else {
+                    // İlgimizi çekmeyen ilanı da bir daha taramamak için hayalet olarak ekleyelim ama listeye koymayalım
+                    // Save as seen but return empty array so bot doesn't send message for non-CE jobs.
+                    this.saveSeen([{ url: link.url, title: link.title, date: new Date().toISOString() }]);
+                }
+            } catch (err) {
+                console.error(`SBB detay çekilemedi (${link.url}):`, err.message);
+            }
+        }
+
+        return announcements;
     }
 
     async getNewAnnouncements(uni) {

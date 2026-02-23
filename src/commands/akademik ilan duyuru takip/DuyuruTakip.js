@@ -4,39 +4,35 @@ const AnnouncementService = require('../../services/AnnouncementService');
 class DuyuruTakip {
     constructor() {
         this.command = '!takip';
-        this.description = 'Üniversite ilan/duyuru takip sistemi. Kullanım: !takip başlat / durdur / kontrol / durum / liste';
+        this.description = 'Üniversite ilan/duyuru takip sistemi. Kullanım: !takip başlat / durdur / 3dk aç / 3dk kapat / kontrol / durum / liste';
 
-        // Sınıf seviyesine (this context'ine) taşındı
         this.announcementService = new AnnouncementService();
-        this.scheduledJob = null;
+        this.dailyJob = null;
         this.lastCheckTime = null;
-        this.notifyNumber = process.env.WWEBJS_TEST_REMOTE_ID || '905387994516@c.us';
+        this.notifyNumber = process.env.WWEBJS_TEST_REMOTE_ID || '905362494516@c.us';
     }
 
-    // Bot açıldığında otomatik çalışır
     async init(client) {
         this.client = client;
 
-        // İlk çalıştırmada mevcut ilanları "görülmüş" olarak kaydet
         const isFirstRun = await this.announcementService.initializeSeen();
         if (isFirstRun) {
             console.log('📡 İlan takip sistemi: İlk tarama tamamlandı, mevcut ilanlar kaydedildi.');
         }
 
         // Otomatik olarak günlük takibi başlat (her gün saat 16:00)
-        this.startSchedule(client);
+        this.startDailySchedule(client);
         console.log('📡 İlan takip sistemi aktif! (Her gün saat 16:00 kontrol)');
     }
 
-    startSchedule(client) {
-        // Önceki job varsa iptal et
-        if (this.scheduledJob) {
-            this.scheduledJob.cancel();
+    startDailySchedule(client) {
+        if (this.dailyJob) {
+            this.dailyJob.cancel();
         }
 
-        // Her gün saat 16:00'da çalışacak (cron: dakika saat gün ay haftanıngünü)
-        this.scheduledJob = schedule.scheduleJob('0 16 * * *', async () => {
-            console.log('⏰ Zamanlanmış ilan kontrolü başladı...');
+        // Her gün saat 16:00'da çalışacak
+        this.dailyJob = schedule.scheduleJob('0 16 * * *', async () => {
+            console.log('⏰ Günlük 16:00 ilan kontrolü başladı...');
             await this.runCheck(client);
         });
 
@@ -48,7 +44,6 @@ class DuyuruTakip {
             this.lastCheckTime = new Date();
             const results = await this.announcementService.checkAllUniversities();
 
-            // Sadece yeni ilan varsa bildirim gönder
             const hasNew = results.some(r => r.announcements && r.announcements.length > 0);
             const hasError = results.some(r => r.error);
 
@@ -58,21 +53,25 @@ class DuyuruTakip {
                     await client.sendMessage(this.notifyNumber, message);
                     console.log('✅ Yeni ilan bildirimi gönderildi.');
                 }
-            } else if (hasError) {
+            }
+
+            if (hasError) {
                 const errorResults = results.filter(r => r.error);
                 let errMsg = '⚠️ *İlan Kontrol Hatası*\n\n';
                 for (const r of errorResults) {
                     errMsg += `❌ ${r.university.shortName}: ${r.error}\n`;
                 }
                 await client.sendMessage(this.notifyNumber, errMsg);
-            } else {
-                // Yeni ilan yok — yine de bildirim gönder
-                let noNewsMsg = '✅ *Duyurular kontrol edildi, yeni ilan yok.*\n\n';
-                for (const uni of this.announcementService.universities) {
-                    noNewsMsg += `🔗 ${uni.url}\n`;
-                }
-                await client.sendMessage(this.notifyNumber, noNewsMsg.trim());
-                console.log('ℹ️ Yeni ilan yok, bildirim gönderildi. Son kontrol:', this.lastCheckTime.toLocaleString('tr-TR'));
+            }
+
+            if (!hasNew && !hasError) {
+                // Hiçbir yerde ilan yoksa iki ayrı mesajı gönderiyoruz
+                let noUniNews = '✅ Okullar için yeni ilan / duyuru eklenmedi.';
+                let noSbbNews = '✅ Kariyer Kapısı\'nda (SBB) yeni ilan yüklenmedi.';
+
+                await client.sendMessage(this.notifyNumber, noUniNews);
+                await client.sendMessage(this.notifyNumber, noSbbNews);
+                console.log('ℹ️ Yeni ilan yok, bildirimler ayrı ayrı gönderildi. Son kontrol:', this.lastCheckTime.toLocaleString('tr-TR'));
             }
 
             return results;
@@ -86,20 +85,20 @@ class DuyuruTakip {
         const body = msg.body.trim().toLowerCase();
 
         if (body === '!takip başlat' || body === '!takip baslat') {
-            if (this.scheduledJob) {
-                msg.reply('ℹ️ Takip zaten aktif! Her gün saat 16:00\'da kontrol ediliyor.');
+            if (this.dailyJob) {
+                msg.reply('ℹ️ Günlük takip zaten aktif! Her gün saat 16:00\'da kontrol ediliyor.');
             } else {
-                this.startSchedule(client);
-                msg.reply('✅ İlan takibi başlatıldı! Her gün saat 16:00\'da kontrol edilecek.');
+                this.startDailySchedule(client);
+                msg.reply('✅ Günlük ilan takibi başlatıldı! Her gün saat 16:00\'da kontrol edilecek.');
             }
         }
         else if (body === '!takip durdur') {
-            if (this.scheduledJob) {
-                this.scheduledJob.cancel();
-                this.scheduledJob = null;
-                msg.reply('⏹️ İlan takibi durduruldu.');
+            if (this.dailyJob) {
+                this.dailyJob.cancel();
+                this.dailyJob = null;
+                msg.reply('⏹️ Günlük ilan takibi durduruldu.');
             } else {
-                msg.reply('ℹ️ Takip zaten aktif değil.');
+                msg.reply('ℹ️ Günlük takip zaten aktif değil.');
             }
         }
         else if (body === '!takip kontrol') {
@@ -110,30 +109,70 @@ class DuyuruTakip {
             if (!hasNew) {
                 const errorResults = results.filter(r => r.error);
                 if (errorResults.length === 0) {
-                    msg.reply('ℹ️ Şu an yeni ilan/duyuru bulunmuyor.');
+                    msg.reply('ℹ️ Şu an okullarda veya Kariyer Kapısı\'nda yeni ilan/duyuru bulunmuyor.');
                 }
             }
         }
         else if (body === '!takip durum') {
-            const isActive = this.scheduledJob !== null;
+            const isDailyActive = this.dailyJob !== null;
             const uniCount = this.announcementService.universities.length;
             const lastCheck = this.lastCheckTime
                 ? this.lastCheckTime.toLocaleString('tr-TR')
                 : 'Henüz kontrol yapılmadı';
 
-            const nextFire = this.scheduledJob && this.scheduledJob.nextInvocation()
-                ? this.scheduledJob.nextInvocation().toLocaleString('tr-TR')
+            const nextDailyFire = this.dailyJob && this.dailyJob.nextInvocation()
+                ? this.dailyJob.nextInvocation().toLocaleString('tr-TR')
                 : 'Belirsiz';
 
             let statusMsg = '📊 *İlan Takip Durumu*\n\n';
-            statusMsg += `• Durum: ${isActive ? '✅ Aktif' : '⏹️ Pasif'}\n`;
-            statusMsg += `• Kontrol Saati: Her gün 16:00\n`;
-            statusMsg += `• Takip Edilen: ${uniCount} üniversite\n`;
+            statusMsg += `• Günlük Durum (16:00): ${isDailyActive ? '✅ Aktif' : '⏹️ Pasif'}\n`;
+            statusMsg += `• Takip Edilen: ${uniCount} kurum\n`;
             statusMsg += `• Son Kontrol: ${lastCheck}\n`;
-            statusMsg += `• Sonraki Kontrol: ${nextFire}\n`;
+            statusMsg += `• Sonraki Günlük: ${nextDailyFire}\n`;
             statusMsg += `• Bildirim Numarası: ${this.notifyNumber.replace('@c.us', '')}`;
 
             msg.reply(statusMsg);
+        }
+        else if (body === '!takip hepsi' || body === '!takip tümilanlar') {
+            msg.reply('🔍 Tüm üniversitelerdeki GÜNCEL kayıtlı ilanlar tek tek toplanıyor, bu işlem biraz sürebilir...');
+
+            try {
+                let allSitesMsg = '🏫 *Tüm Üniversitelerdeki İlanlar*\n\n';
+                let hasAny = false;
+
+                for (const uni of this.announcementService.universities) {
+                    try {
+                        const anns = await this.announcementService.checkUniversity(uni);
+                        if (anns.length > 0) {
+                            hasAny = true;
+                            allSitesMsg += `📌 *${uni.shortName}* (${anns.length} ilan)\n`;
+
+                            // 5 tanesini gösterelim çok uzun olmaması için
+                            const displayAnns = anns.slice(0, 5);
+                            for (const ann of displayAnns) {
+                                allSitesMsg += `• ${ann.title}\n  🔗 ${ann.url}\n`;
+                            }
+                            if (anns.length > 5) {
+                                allSitesMsg += `... ve ${anns.length - 5} ilan daha.\n`;
+                            }
+                            allSitesMsg += '\n';
+                        }
+                    } catch (e) {
+                        allSitesMsg += `❌ *${uni.shortName}* taranırken hata oluştu.\n\n`;
+                    }
+                }
+
+                if (!hasAny) {
+                    allSitesMsg = 'ℹ️ Okullarda ve Kariyer Kapısı\'nda listelenecek mevcut ilan bulunamadı.';
+                } else if (allSitesMsg.length > 4000) {
+                    allSitesMsg = allSitesMsg.substring(0, 4000) + '\n... (Mesaj çok uzun olduğu için kesildi)';
+                }
+
+                await msg.reply(allSitesMsg.trim());
+            } catch (error) {
+                console.error('Tüm ilanları getirme hatası:', error);
+                msg.reply('❌ İlanlar toplanırken bir hata oluştu.');
+            }
         }
         else if (body.startsWith('!takip ilanlar')) {
             const parts = body.split(' ');
@@ -198,9 +237,10 @@ class DuyuruTakip {
             msg.reply(
                 '❌ Geçersiz komut.\n\n' +
                 '*Kullanım:*\n' +
-                '• `!takip başlat` - Günlük takibi başlatır\n' +
-                '• `!takip durdur` - Takibi durdurur\n' +
-                '• `!takip kontrol` - Anlık kontrol yapar\n' +
+                '• `!takip başlat` - Günlük (16:00) takibi başlatır\n' +
+                '• `!takip durdur` - Günlük takibi durdurur\n' +
+                '• `!takip kontrol` - Anlık BİLDİRİM kontrolü yapar\n' +
+                '• `!takip hepsi` - Tüm sitelerdeki mevcut ilanları getirir\n' +
                 '• `!takip durum` - Takip durumunu gösterir\n' +
                 '• `!takip liste` - Üniversite listesini gösterir'
             );
