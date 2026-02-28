@@ -276,11 +276,16 @@ class AnnouncementService {
                     });
                 }
             } catch (error) {
-                console.error(`${uni.shortName} kontrol hatası:`, error.message);
-                results.push({
-                    university: uni,
-                    error: error.message
-                });
+                // 403 hatalarını sessizce atla (VPS IP engeli) - sadece logla, WhatsApp'a gönderme
+                if (error.message && error.message.includes('403')) {
+                    console.warn(`⚠️ ${uni.shortName} erişim engeli (403), atlanıyor:`, error.message);
+                } else {
+                    console.error(`${uni.shortName} kontrol hatası:`, error.message);
+                    results.push({
+                        university: uni,
+                        error: error.message
+                    });
+                }
             }
         }
         return results;
