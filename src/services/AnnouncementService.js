@@ -209,9 +209,12 @@ class AnnouncementService {
         });
 
         // Tüm SBB linklerine tek tek girip metni kontrol edelim:
+        const sbbKey = 'SBB (Kamu)';
+        const sbbSeenUrls = this.seenAnnouncements[sbbKey] || [];
+
         for (const link of sbbLinks) {
             // Check if we already saw this SBB link
-            if (this.seenAnnouncements.some(seen => seen.url === link.url)) {
+            if (sbbSeenUrls.includes(link.url)) {
                 continue; // Zaten görülmüş ilansa içine girmeyelim boşuna (performans)
             }
 
@@ -229,8 +232,11 @@ class AnnouncementService {
                     });
                 } else {
                     // İlgimizi çekmeyen ilanı da bir daha taramamak için hayalet olarak ekleyelim ama listeye koymayalım
-                    // Save as seen but return empty array so bot doesn't send message for non-CE jobs.
-                    this.saveSeen([{ url: link.url, title: link.title, date: new Date().toISOString() }]);
+                    if (!this.seenAnnouncements[sbbKey]) this.seenAnnouncements[sbbKey] = [];
+                    if (!this.seenAnnouncements[sbbKey].includes(link.url)) {
+                        this.seenAnnouncements[sbbKey].push(link.url);
+                    }
+                    this.saveSeen();
                 }
             } catch (err) {
                 console.error(`SBB detay çekilemedi (${link.url}):`, err.message);

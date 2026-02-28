@@ -1,6 +1,16 @@
 const schedule = require('node-schedule');
 const AnnouncementService = require('../../services/AnnouncementService');
 
+// =============================================
+// 🕐 GÜNLÜK KONTROL SAATİ — Buradan değiştirin!
+// Format: 'SS:DD' (örn: '06:40', '09:00', '16:00')
+const DAILY_CHECK_TIME = '06:50';
+// =============================================
+
+// DAILY_CHECK_TIME'dan cron ifadesini otomatik üret
+const [CHECK_HOUR, CHECK_MINUTE] = DAILY_CHECK_TIME.split(':').map(Number);
+const CRON_EXPRESSION = `${CHECK_MINUTE} ${CHECK_HOUR} * * *`;
+
 class DuyuruTakip {
     constructor() {
         this.command = '!takip';
@@ -20,9 +30,9 @@ class DuyuruTakip {
             console.log('📡 İlan takip sistemi: İlk tarama tamamlandı, mevcut ilanlar kaydedildi.');
         }
 
-        // Otomatik olarak günlük takibi başlat (her gün saat 16:00)
+        // Otomatik olarak günlük takibi başlat
         this.startDailySchedule(client);
-        console.log('📡 İlan takip sistemi aktif! (Her gün saat 16:00 kontrol)');
+        console.log(`📡 İlan takip sistemi aktif! (Her gün saat ${DAILY_CHECK_TIME} kontrol)`);
     }
 
     startDailySchedule(client) {
@@ -30,13 +40,13 @@ class DuyuruTakip {
             this.dailyJob.cancel();
         }
 
-        // Her gün saat 16:00'da çalışacak
-        this.dailyJob = schedule.scheduleJob('0 16 * * *', async () => {
-            console.log('⏰ Günlük 16:00 ilan kontrolü başladı...');
+        // Her gün belirlenen saatte çalışacak (DAILY_CHECK_TIME)
+        this.dailyJob = schedule.scheduleJob(CRON_EXPRESSION, async () => {
+            console.log(`⏰ Günlük ${DAILY_CHECK_TIME} ilan kontrolü başladı...`);
             await this.runCheck(client);
         });
 
-        console.log('⏰ Günlük ilan kontrolü zamanlandı: Her gün saat 16:00');
+        console.log(`⏰ Günlük ilan kontrolü zamanlandı: Her gün saat ${DAILY_CHECK_TIME}`);
     }
 
     async runCheck(client) {
@@ -86,10 +96,10 @@ class DuyuruTakip {
 
         if (body === '!takip başlat' || body === '!takip baslat') {
             if (this.dailyJob) {
-                msg.reply('ℹ️ Günlük takip zaten aktif! Her gün saat 16:00\'da kontrol ediliyor.');
+                msg.reply(`ℹ️ Günlük takip zaten aktif! Her gün saat ${DAILY_CHECK_TIME}'da kontrol ediliyor.`);
             } else {
                 this.startDailySchedule(client);
-                msg.reply('✅ Günlük ilan takibi başlatıldı! Her gün saat 16:00\'da kontrol edilecek.');
+                msg.reply(`✅ Günlük ilan takibi başlatıldı! Her gün saat ${DAILY_CHECK_TIME}'da kontrol edilecek.`);
             }
         }
         else if (body === '!takip durdur') {
@@ -125,7 +135,7 @@ class DuyuruTakip {
                 : 'Belirsiz';
 
             let statusMsg = '📊 *İlan Takip Durumu*\n\n';
-            statusMsg += `• Günlük Durum (16:00): ${isDailyActive ? '✅ Aktif' : '⏹️ Pasif'}\n`;
+            statusMsg += `• Günlük Durum (${DAILY_CHECK_TIME}): ${isDailyActive ? '✅ Aktif' : '⏹️ Pasif'}\n`;
             statusMsg += `• Takip Edilen: ${uniCount} kurum\n`;
             statusMsg += `• Son Kontrol: ${lastCheck}\n`;
             statusMsg += `• Sonraki Günlük: ${nextDailyFire}\n`;
@@ -237,7 +247,7 @@ class DuyuruTakip {
             msg.reply(
                 '❌ Geçersiz komut.\n\n' +
                 '*Kullanım:*\n' +
-                '• `!takip başlat` - Günlük (16:00) takibi başlatır\n' +
+                `• \`!takip başlat\` - Günlük (${DAILY_CHECK_TIME}) takibi başlatır\n` +
                 '• `!takip durdur` - Günlük takibi durdurur\n' +
                 '• `!takip kontrol` - Anlık BİLDİRİM kontrolü yapar\n' +
                 '• `!takip hepsi` - Tüm sitelerdeki mevcut ilanları getirir\n' +
