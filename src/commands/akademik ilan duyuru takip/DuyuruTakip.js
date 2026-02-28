@@ -4,7 +4,7 @@ const AnnouncementService = require('../../services/AnnouncementService');
 // =============================================
 // 🕐 GÜNLÜK KONTROL SAATİ — Buradan değiştirin!
 // Format: 'SS:DD' (örn: '06:40', '09:00', '16:00')
-const DAILY_CHECK_TIME = '07:10';
+const DAILY_CHECK_TIME = '07:20';
 // =============================================
 
 // DAILY_CHECK_TIME'dan cron ifadesini otomatik üret
